@@ -4,6 +4,7 @@
     const ACCOUNT_KEY = 'currentUser';
     const USERS_KEY = 'localLensUsers';
     const DEFAULT_COLOR = '#176d6a';
+    let lastAppliedSignature = '';
 
     document.addEventListener('DOMContentLoaded', initializeAccountCustomization);
 
@@ -12,10 +13,8 @@
         if (!dashboard) return;
 
         addCustomizationCard();
-        applyCustomization();
-
-        const observer = new MutationObserver(() => applyCustomization());
-        observer.observe(dashboard, { attributes: true, childList: true, subtree: true });
+        applyCustomizationIfChanged(true);
+        window.setInterval(() => applyCustomizationIfChanged(false), 1000);
     }
 
     function addCustomizationCard() {
@@ -108,7 +107,19 @@
         const updatedUser = users.find((user) => user.id === currentUser.id);
         setCurrentUser(publicUser(updatedUser));
         applyCustomization(updatedUser);
+        lastAppliedSignature = getUserSignature(updatedUser);
         showCustomizationToast('Account customization saved.');
+    }
+
+    function applyCustomizationIfChanged(force) {
+        const user = findStoredCurrentUser();
+        const signature = user ? getUserSignature(user) : '';
+        if (!force && signature === lastAppliedSignature) return;
+        lastAppliedSignature = signature;
+        if (user) {
+            fillCustomizationForm();
+            applyCustomization(user);
+        }
     }
 
     function applyCustomization(user = findStoredCurrentUser()) {
@@ -130,7 +141,12 @@
 
         const favorite = user.favoriteCategory ? `<span><i class="fas fa-heart"></i> ${escapeHtml(user.favoriteCategory)}</span>` : '';
         const bio = user.bio ? `<p>${escapeHtml(user.bio)}</p>` : '';
-        meta.innerHTML = `${favorite}${bio}`;
+        const nextHtml = `${favorite}${bio}`;
+        if (meta.innerHTML !== nextHtml) meta.innerHTML = nextHtml;
+    }
+
+    function getUserSignature(user) {
+        return [user.id, user.email, user.avatarColor, user.favoriteCategory, user.bio, user.showEmail].join('|');
     }
 
     function updateBioCount() {
