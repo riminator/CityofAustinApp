@@ -4,17 +4,14 @@
     const ACCOUNT_KEY = 'currentUser';
     const USERS_KEY = 'localLensUsers';
     const DEFAULT_COLOR = '#176d6a';
-    let lastAppliedSignature = '';
+    const COLOR_OPTIONS = ['#176d6a', '#225c68', '#8a5a12', '#7c3aed', '#b04435'];
 
     document.addEventListener('DOMContentLoaded', initializeAccountCustomization);
 
     function initializeAccountCustomization() {
-        const dashboard = document.getElementById('signed-in-view');
-        if (!dashboard) return;
-
         addCustomizationCard();
-        applyCustomizationIfChanged(true);
-        window.setInterval(() => applyCustomizationIfChanged(false), 1000);
+        bindAccountRefreshEvents();
+        syncCustomizationView();
     }
 
     function addCustomizationCard() {
@@ -26,20 +23,23 @@
         const card = document.createElement('section');
         card.className = 'account-card customize-card';
         card.innerHTML = `
-            <div class="section-title-row">
+            <div class="section-title-row customize-title-row">
                 <span class="status-icon"><i class="fas fa-palette"></i></span>
                 <div>
                     <h2>Customize account</h2>
-                    <p>Personalize how your account appears on this browser.</p>
+                    <p>Choose a profile color, a short bio, and what details people can see.</p>
                 </div>
             </div>
             <form id="customize-form" class="customize-form">
-                <div class="form-grid account-form-grid">
-                    <div class="form-group">
+                <div class="customize-grid">
+                    <div class="form-group color-field">
                         <label for="avatar-color">Avatar color</label>
                         <div class="color-control">
-                            <input type="color" id="avatar-color" value="${DEFAULT_COLOR}">
-                            <span id="avatar-color-label">Teal</span>
+                            <input type="color" id="avatar-color" value="${DEFAULT_COLOR}" aria-label="Avatar color">
+                            <div class="color-swatches" aria-label="Preset avatar colors">
+                                ${COLOR_OPTIONS.map((color) => `<button type="button" class="color-swatch" data-color="${color}" style="--swatch-color: ${color};" aria-label="Use color ${color}"></button>`).join('')}
+                            </div>
+                            <span id="avatar-color-label">${DEFAULT_COLOR.toUpperCase()}</span>
                         </div>
                     </div>
                     <div class="form-group">
@@ -63,29 +63,73 @@
                         <span>Show my email on my account card</span>
                     </label>
                 </div>
-                <button class="account-secondary-btn" type="submit"><i class="fas fa-wand-magic-sparkles"></i> Save customization</button>
+                <button class="account-secondary-btn" type="submit"><i class="fas fa-save"></i> Save customization</button>
             </form>
         `;
 
         profileCard.insertAdjacentElement('afterend', card);
-        fillCustomizationForm();
-
-        const bioInput = document.getElementById('profile-bio');
-        bioInput?.addEventListener('input', updateBioCount);
-        document.getElementById('avatar-color')?.addEventListener('input', updateColorLabel);
-        document.getElementById('customize-form')?.addEventListener('submit', handleCustomizationSave);
+        bindCustomizationControls();
     }
 
-    function fillCustomizationForm() {
-        const user = findStoredCurrentUser();
-        if (!user) return;
+    function bindCustomizationControls() {
+        document.getElementById('customize-form')?.addEventListener('submit', handleCustomizationSave);
+        document.getElementById('profile-bio')?.addEventListener('input', updateBioCount);
+        document.getElementById('avatar-color')?.addEventListener('input', () => {
+            updateColorLabel();
+            updateSelectedSwatch();
+        });
 
-        document.getElementById('avatar-color').value = user.avatarColor || DEFAULT_COLOR;
-        document.getElementById('favorite-category').value = user.favoriteCategory || '';
-        document.getElementById('profile-bio').value = user.bio || '';
-        document.getElementById('show-email').checked = Boolean(user.showEmail);
+        document.querySelectorAll('.color-swatch').forEach((button) => {
+            button.addEventListener('click', () => {
+                const colorInput = document.getElementById('avatar-color');
+                colorInput.value = button.dataset.color || DEFAULT_COLOR;
+                updateColorLabel();
+                updateSelectedSwatch();
+            });
+        });
+    }
+
+    function bindAccountRefreshEvents() {
+        ['login-form', 'signup-form', 'verification-form', 'profile-form'].forEach((id) => {
+            document.getElementById(id)?.addEventListener('submit', () => scheduleSync(), true);
+        });
+
+        document.getElementById('logout-button')?.addEventListener('click', () => scheduleSync(), true);
+        document.getElementById('resend-code-button')?.addEventListener('click', () => scheduleSync(), true);
+        window.addEventListener('storage', (event) => {
+            if (event.key === ACCOUNT_KEY || event.key === USERS_KEY) syncCustomizationView();
+        });
+    }
+
+    function scheduleSync() {
+        window.setTimeout(syncCustomizationView, 250);
+    }
+
+    function syncCustomizationView() {
+        const user = findStoredCurrentUser();
+        if (!user) {
+            clearCustomizationPreview();
+            return;
+        }
+
+        fillCustomizationForm(user);
+        applyCustomization(user);
+    }
+
+    function fillCustomizationForm(user) {
+        const colorInput = document.getElementById('avatar-color');
+        const categoryInput = document.getElementById('favorite-category');
+        const bioInput = document.getElementById('profile-bio');
+        const showEmailInput = document.getElementById('show-email');
+
+        if (colorInput) colorInput.value = user.avatarColor || DEFAULT_COLOR;
+        if (categoryInput) categoryInput.value = user.favoriteCategory || '';
+        if (bioInput) bioInput.value = user.bio || '';
+        if (showEmailInput) showEmailInput.checked = Boolean(user.showEmail);
+
         updateBioCount();
         updateColorLabel();
+        updateSelectedSwatch();
     }
 
     function handleCustomizationSave(event) {
@@ -93,10 +137,10 @@
         const currentUser = findStoredCurrentUser();
         if (!currentUser) return;
 
-        const avatarColor = document.getElementById('avatar-color').value || DEFAULT_COLOR;
-        const favoriteCategory = document.getElementById('favorite-category').value;
-        const bio = document.getElementById('profile-bio').value.trim();
-        const showEmail = document.getElementById('show-email').checked;
+        const avatarColor = document.getElementById('avatar-color')?.value || DEFAULT_COLOR;
+        const favoriteCategory = document.getElementById('favorite-category')?.value || '';
+        const bio = document.getElementById('profile-bio')?.value.trim() || '';
+        const showEmail = Boolean(document.getElementById('show-email')?.checked);
 
         const users = getUsers().map((user) => {
             if (user.id !== currentUser.id) return user;
@@ -107,24 +151,10 @@
         const updatedUser = users.find((user) => user.id === currentUser.id);
         setCurrentUser(publicUser(updatedUser));
         applyCustomization(updatedUser);
-        lastAppliedSignature = getUserSignature(updatedUser);
         showCustomizationToast('Account customization saved.');
     }
 
-    function applyCustomizationIfChanged(force) {
-        const user = findStoredCurrentUser();
-        const signature = user ? getUserSignature(user) : '';
-        if (!force && signature === lastAppliedSignature) return;
-        lastAppliedSignature = signature;
-        if (user) {
-            fillCustomizationForm();
-            applyCustomization(user);
-        }
-    }
-
-    function applyCustomization(user = findStoredCurrentUser()) {
-        if (!user) return;
-
+    function applyCustomization(user) {
         const avatar = document.getElementById('profile-avatar');
         if (avatar) avatar.style.background = user.avatarColor || DEFAULT_COLOR;
 
@@ -141,12 +171,12 @@
 
         const favorite = user.favoriteCategory ? `<span><i class="fas fa-heart"></i> ${escapeHtml(user.favoriteCategory)}</span>` : '';
         const bio = user.bio ? `<p>${escapeHtml(user.bio)}</p>` : '';
-        const nextHtml = `${favorite}${bio}`;
-        if (meta.innerHTML !== nextHtml) meta.innerHTML = nextHtml;
+        meta.innerHTML = `${favorite}${bio}` || '<p class="profile-custom-empty">No custom profile details yet.</p>';
     }
 
-    function getUserSignature(user) {
-        return [user.id, user.email, user.avatarColor, user.favoriteCategory, user.bio, user.showEmail].join('|');
+    function clearCustomizationPreview() {
+        const meta = document.getElementById('profile-custom-meta');
+        if (meta) meta.remove();
     }
 
     function updateBioCount() {
@@ -161,8 +191,19 @@
         if (label) label.textContent = color.toUpperCase();
     }
 
+    function updateSelectedSwatch() {
+        const color = (document.getElementById('avatar-color')?.value || DEFAULT_COLOR).toLowerCase();
+        document.querySelectorAll('.color-swatch').forEach((button) => {
+            button.classList.toggle('active', button.dataset.color?.toLowerCase() === color);
+        });
+    }
+
     function getUsers() {
-        return JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+        try {
+            return JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+        } catch {
+            return [];
+        }
     }
 
     function saveUsers(users) {
@@ -170,7 +211,11 @@
     }
 
     function getCurrentUser() {
-        return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || 'null');
+        try {
+            return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || 'null');
+        } catch {
+            return null;
+        }
     }
 
     function setCurrentUser(user) {
