@@ -166,7 +166,7 @@
         filteredLocations.forEach(location => {
             const marker = L.marker([location.lat, location.lng])
                 .addTo(map)
-                .bindPopup(buildPopup(location));
+                .bindPopup(buildPopup(location), { autoPan: false, keepInView: false });
 
             markers.push({ id: location.id, marker });
             bounds.extend([location.lat, location.lng]);
@@ -204,14 +204,26 @@
                 ${location.description ? `<p>${escapeHtml(location.description)}</p>` : ''}
             `;
 
-            item.addEventListener('click', () => {
-                map.setView([location.lat, location.lng], 16);
-                const match = markers.find(candidate => candidate.id === location.id);
-                if (match) match.marker.openPopup();
-            });
+            item.addEventListener('click', () => focusLocation(location));
 
             list.appendChild(item);
         });
+    }
+
+    function focusLocation(location) {
+        if (!map) return;
+
+        const markerInfo = markers.find(candidate => candidate.id === location.id);
+        const latLng = [location.lat, location.lng];
+        const zoom = Math.max(map.getZoom(), 16);
+
+        map.closePopup();
+        map.flyTo(latLng, zoom, { animate: true, duration: 0.35 });
+
+        window.setTimeout(() => {
+            map.setView(latLng, zoom, { animate: false });
+            if (markerInfo) markerInfo.marker.openPopup();
+        }, 380);
     }
 
     function buildPopup(location) {
