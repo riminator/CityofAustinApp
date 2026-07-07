@@ -1,0 +1,44 @@
+.map-controls {
+    position: sticky;
+    top: 86px;
+    z-index: 1200;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid #e3e8eb;
+    backdrop-filter: blur(8px);
+}
+
+.map-section,
+#map-container,
+#map {
+    scroll-margin-top: 150px;
+}
+
+#map {
+    position: relative;
+    z-index: 1;
+}
+
+#map .leaflet-control-container .leaflet-top {
+    top: 12px;
+}
+
+#map .leaflet-control-container .leaflet-left {
+    left: 12px;
+}
+
+#map:focus,
+#map .leaflet-container:focus {
+    outline: none;
+}
+
+@media (max-width: 820px) {
+    .map-controls {
+        top: 118px;
+        flex-wrap: wrap;
+        padding: 10px 14px;
+    }
+}

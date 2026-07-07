@@ -2,7 +2,7 @@ const ACCOUNT_KEY = 'currentUser';
 const USERS_KEY = 'localLensUsers';
 const SUBMISSIONS_KEY = 'submittedBusinesses';
 const COOLDOWN_MS = 2 * 60 * 60 * 1000;
-const VERIFICATION_EMAIL_ENDPOINT = 'https://script.google.com/macros/s/AKfycby4kHh0gWg5aaj24j3aQyoxSQrCnuqW5fBAsMv_2Cm2zbgDOjMIrk5YfvWmG3IKOlPJ/exec';
+const VERIFICATION_EMAIL_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwtr1WRUwSgo19zQtZjnCzTUpv9Atpcu6vNP5-_BdWrv5J8-0Bm89j2aivF3S3jV0vT/exec';
 
 const signedOutView = document.getElementById('signed-out-view');
 const signedInView = document.getElementById('signed-in-view');
